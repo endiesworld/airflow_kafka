@@ -84,6 +84,10 @@ x-airflow-common:
       condition: service_healthy
     postgres:
       condition: service_healthy
+networks:
+  default:
+    name: confluent
+    external: true
 
 services:
   zookeeper:
@@ -100,8 +104,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-    networks:
-      - confluent
 
 
   broker:
@@ -133,8 +135,6 @@ services:
       CONFLUENT_METRICS_REPORTER_TOPIC_REPLICAS: 1
       CONFLUENT_METRICS_ENABLE: 'false'
       CONFLUENT_SUPPORT_CUSTOMER_ID: 'anonymous'
-    networks:
-      - confluent
     healthcheck:
       test: [ "CMD", "bash", "-c", 'nc -z localhost 9092' ]
       interval: 10s
@@ -155,8 +155,6 @@ services:
       SCHEMA_REGISTRY_HOST_NAME: schema-registry
       SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: 'broker:29092'
       SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
-    networks:
-      - confluent
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:8081/" ]
       interval: 30s
@@ -184,8 +182,6 @@ services:
       CONFLUENT_METRICS_TOPIC_REPLICATION: 1
       CONFLIENT_METRICS_ENABLE: 'false'
       PORT: 9021
-    networks:
-      - confluent
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:9021/health" ]
       interval: 30s
@@ -429,6 +425,39 @@ services:
       <<: *airflow-common-depends-on
       airflow-init:
         condition: service_completed_successfully
+
+
+  spark-master:
+    image: bitnami/spark:latest
+    command: bin/spark-class org.apache.spark.deploy.master.Master
+    ports:
+      - "9090:8080"
+      - "7077:7077"
+
+
+  spark-worker:
+    image: bitnami/spark:latest
+    command: bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
+    depends_on:
+      - spark-master
+    environment:
+      SPARK_MODE: worker
+      SPARK_WORKER_CORES: 2
+      SPARK_WORKER_MEMORY: 1g
+      SPARK_MASTER_URL: spark://spark-master:7077
+
+
+  cassandra_db:
+    image: cassandra:latest
+    container_name: cassandra
+    hostname: cassandra
+    ports:
+      - "9042:9042"
+    environment:
+      - MAX_HEAP_SIZE=512M
+      - HEAP_NEWSIZE=100M
+      - CASSANDRA_USERNAME=cassandra
+      - CASSANDRA_PASSWORD=cassandra
 
 volumes:
   postgres-db-volume:
