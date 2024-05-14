@@ -53,9 +53,12 @@ x-airflow-common:
   # build: .
   environment:
     &airflow-common-env
+    AIRFLOW_IMAGE_NAME: apache/airflow:2.9.0[kafka]
     AIRFLOW__CORE__EXECUTOR: CeleryExecutor
     AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
     AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://airflow:airflow@postgres/airflow
+    AIRFLOW__KAFKA__BOOTSTRAP_SERVERS: 'broker:29092'
+    AIRFLOW__KAFKA__SECURITY_PROTOCOL: PLAINTEXT
     AIRFLOW__CELERY__BROKER_URL: redis://:@redis:6379/0
     AIRFLOW__CORE__FERNET_KEY: ''
     AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
@@ -105,7 +108,6 @@ services:
       timeout: 5s
       retries: 5
 
-
   broker:
     image: confluentinc/cp-server:7.4.0
     hostname: broker
@@ -141,7 +143,6 @@ services:
       timeout: 5s
       retries: 5
 
-
   schema-registry:
     image: confluentinc/cp-schema-registry:7.4.0
     hostname: schema-registry
@@ -160,7 +161,6 @@ services:
       interval: 30s
       timeout: 10s
       retries: 5
-
 
   control-center:
     image: confluentinc/cp-enterprise-control-center:7.4.0
@@ -187,23 +187,6 @@ services:
       interval: 30s
       timeout: 10s
       retries: 5
-
-
-  # kafka-rest:
-    # image: confluentinc/cp-kafka-rest:7.4.0
-    # hostname: kafka-rest
-    # ports:
-    #   - "8082:8082"
-    # depends_on:
-    #   - schema-registry
-    #   - broker
-    # environment:
-    #   KAFKA_REST_BOOTSTRAP_SERVERS: 'broker:29092'
-    #   KAFKA_REST_ZOOKEEPER_CONNECT: 'zookeeper:2181'
-    #   KAFKA_REST_SCHEMA_REGISTRY_URL: 'http://localhost:8081'
-    #   KAFKA_REST_HOST_NAME: localhost
-    #   KAFKA_REST_LISTENERS: 'http://0.0.0.0:8082'
-
 
   postgres:
     image: postgres:13
@@ -280,37 +263,14 @@ services:
       <<: *airflow-common-env
       # Required to handle warm shutdown of the celery workers properly
       # See https://airflow.apache.org/docs/docker-stack/entrypoint.html#signal-propagation
+      AIRFLOW__KAFKA__BOOTSTRAP_SERVERS: 'broker:29092'
+      AIRFLOW__KAFKA__SECURITY_PROTOCOL: PLAINTEXT
       DUMB_INIT_SETSID: "0"
     restart: always
     depends_on:
       <<: *airflow-common-depends-on
       airflow-init:
         condition: service_completed_successfully
-
-
-  airflow-worker-2:
-    <<: *airflow-common
-    command: celery worker -q high_cpu
-    healthcheck:
-      # yamllint disable rule:line-length
-      test:
-        - "CMD-SHELL"
-        - 'celery --app airflow.providers.celery.executors.celery_executor.app inspect ping -d "celery@$${HOSTNAME}" || celery --app airflow.executors.celery_executor.app inspect ping -d "celery@$${HOSTNAME}"'
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 30s
-    environment:
-      <<: *airflow-common-env
-      # Required to handle warm shutdown of the celery workers properly
-      # See https://airflow.apache.org/docs/docker-stack/entrypoint.html#signal-propagation
-      DUMB_INIT_SETSID: "0"
-    restart: always
-    depends_on:
-      <<: *airflow-common-depends-on
-      airflow-init:
-        condition: service_completed_successfully
-
 
   airflow-triggerer:
     <<: *airflow-common
