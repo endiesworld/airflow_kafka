@@ -49,16 +49,16 @@ x-airflow-common:
   # In order to add custom dependencies or upgrade provider packages you can use your extended image.
   # Comment the image line, place your Dockerfile in the directory where you placed the docker-compose.yaml
   # and uncomment the "build" line below, Then run `docker-compose build` to build the images.
+  build:
+    context: .
+    dockerfile: ./airflow_resources/Dockerfile
   image: ${AIRFLOW_IMAGE_NAME:-apache/airflow:2.9.0}
   # build: .
   environment:
     &airflow-common-env
-    AIRFLOW_IMAGE_NAME: apache/airflow:2.9.0[kafka]
     AIRFLOW__CORE__EXECUTOR: CeleryExecutor
     AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
     AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://airflow:airflow@postgres/airflow
-    AIRFLOW__KAFKA__BOOTSTRAP_SERVERS: 'broker:29092'
-    AIRFLOW__KAFKA__SECURITY_PROTOCOL: PLAINTEXT
     AIRFLOW__CELERY__BROKER_URL: redis://:@redis:6379/0
     AIRFLOW__CORE__FERNET_KEY: ''
     AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
